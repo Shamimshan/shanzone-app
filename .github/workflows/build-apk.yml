@@ -13,16 +13,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Purana Flutter version pin nahi kar rahe — latest stable use karte
+      # hain, taaki Android Gradle Plugin/AAPT2 bhi naya (SDK 35-compatible)
+      # aaye, aur manual Kotlin version patch ki zaroorat na pade.
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
           channel: 'stable'
 
       - name: Generate missing Android platform files
         run: flutter create . --platforms=android --project-name shanzone_app
-
-      - name: Bump Kotlin Gradle plugin version (fixes plugin compatibility error)
-        run: sed -i '/org.jetbrains.kotlin.android/ s/version "[0-9.]*"/version "1.9.24"/' android/settings.gradle
 
       - name: Get dependencies
         run: flutter pub get
