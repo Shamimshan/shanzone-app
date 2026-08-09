@@ -16,14 +16,29 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> _post(Map<String, dynamic> body) async {
-    final res = await http
-        .post(
-          Uri.parse(baseUrl),
-          headers: {'Content-Type': 'text/plain;charset=utf-8'},
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 20));
-    return jsonDecode(res.body) as Map<String, dynamic>;
+    final client = http.Client();
+    try {
+      final request = http.Request('POST', Uri.parse(baseUrl))
+        ..headers['Content-Type'] = 'text/plain;charset=utf-8'
+        ..body = jsonEncode(body)
+        ..followRedirects = false; // redirect khud manually follow karenge
+
+      final streamed = await client.send(request).timeout(const Duration(seconds: 25));
+      var res = await http.Response.fromStream(streamed);
+
+      // Apps Script POST ka response 302 redirect deta hai (asli JSON
+      // ek googleusercontent.com URL pe hoti hai) — kuch Android network
+      // stacks ise POST ke baad automatically follow nahi karte, isliye
+      // manually follow karte hain.
+      final location = res.headers['location'];
+      if ((res.statusCode == 301 || res.statusCode == 302) && location != null) {
+        res = await client.get(Uri.parse(location)).timeout(const Duration(seconds: 25));
+      }
+
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } finally {
+      client.close();
+    }
   }
 
   /// Sends a 6-digit OTP via SMS to the given 10-digit mobile number.
