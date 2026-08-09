@@ -1,0 +1,31 @@
+name: shanzone_app
+description: SHAN ZONE Broadband — Customer App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  http: ^1.2.1                    # Apps Script API calls
+  shared_preferences: ^2.2.3      # local session / remembered device
+  image_picker: ^1.1.2            # profile photo (camera/gallery)
+  url_launcher: ^6.3.0            # UPI payment intent + WhatsApp link
+  google_fonts: ^6.2.1            # Poppins across the app
+  qr_flutter: ^4.1.0              # UPI QR code in the recharge sheet
+  webview_flutter: ^4.7.0         # Speed Test screen (embeds the website's own test)
+  local_auth: ^2.3.0              # fingerprint quick-login for a remembered device
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
