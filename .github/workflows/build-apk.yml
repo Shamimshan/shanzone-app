@@ -21,6 +21,9 @@ jobs:
       - name: Generate missing Android platform files
         run: flutter create . --platforms=android --project-name shanzone_app
 
+      - name: Bump Kotlin Gradle plugin version (fixes plugin compatibility error)
+        run: sed -i '/org.jetbrains.kotlin.android/ s/version "[0-9.]*"/version "1.9.24"/' android/settings.gradle
+
       - name: Get dependencies
         run: flutter pub get
 
