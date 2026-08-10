@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
 import '../models/account.dart';
+import '../models/payment.dart';
 import '../models/plan.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
@@ -9,11 +11,15 @@ import '../widgets/expiry_progress_bar.dart';
 import '../widgets/language_toggle_button.dart';
 import '../widgets/recharge_bottom_sheet.dart';
 
+const String kWhatsappSupportNumber = '916391224488'; // country code + number
+const String kCallSupportNumber = '6391224488';
+
 class HomeScreen extends StatefulWidget {
   final List<Account> accounts;
   final Account selectedAccount;
   final ValueChanged<Account> onAccountChanged;
   final ValueChanged<List<Account>> onAccountsRefreshed;
+  final VoidCallback? onViewHistory;
 
   const HomeScreen({
     super.key,
@@ -21,6 +27,7 @@ class HomeScreen extends StatefulWidget {
     required this.selectedAccount,
     required this.onAccountChanged,
     required this.onAccountsRefreshed,
+    this.onViewHistory,
   });
 
   @override
@@ -29,6 +36,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool refreshing = false;
+  Payment? lastPayment;
+  bool loadingPayment = true;
 
   Future<void> _refresh() async {
     setState(() => refreshing = true);
@@ -42,10 +51,42 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => refreshing = false);
   }
 
+  Future<void> _loadLastPayment() async {
+    setState(() => loadingPayment = true);
+    final history = await ApiService.getPaymentHistory(widget.selectedAccount.userId);
+    if (mounted) {
+      setState(() {
+        lastPayment = history.isNotEmpty ? history.first : null;
+        loadingPayment = false;
+      });
+    }
+  }
+
+  Future<void> _call() async {
+    final uri = Uri.parse('tel:$kCallSupportNumber');
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  Future<void> _openWhatsapp() async {
+    final uri = Uri.parse('https://wa.me/$kWhatsappSupportNumber');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _refresh(); // Har baar Home khulte hi latest plan/expiry Sheet se le aao
+    _refresh();
+    _loadLastPayment();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedAccount.userId != widget.selectedAccount.userId) {
+      _loadLastPayment();
+    }
   }
 
   @override
@@ -58,7 +99,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: RefreshIndicator(
-        onRefresh: _refresh,
+        onRefresh: () async {
+          await _refresh();
+          await _loadLastPayment();
+        },
         color: AppColors.gradientCenter,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -247,9 +291,114 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+
+              // ---- Recent Payment mini-card ----
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.shadowColor, blurRadius: 16, offset: const Offset(0, 6)),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          color: AppColors.gradientCenter.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: const Icon(Icons.receipt_long_rounded, color: AppColors.gradientCenter, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: loadingPayment
+                            ? Text(S.of('loading'), style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5))
+                            : lastPayment == null
+                                ? Text(S.of('noPayments'), style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5))
+                                : Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${S.of('lastPayment')} · ₹${lastPayment!.amount}',
+                                        style: const TextStyle(color: AppColors.textDark, fontSize: 13, fontWeight: FontWeight.w700),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(lastPayment!.date, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                                    ],
+                                  ),
+                      ),
+                      TextButton(
+                        onPressed: widget.onViewHistory,
+                        child: Text(S.of('viewAll'), style: const TextStyle(color: AppColors.gradientCenter, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ---- Quick support actions ----
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _QuickActionButton(
+                        icon: Icons.call_rounded,
+                        label: S.of('callSupport'),
+                        color: AppColors.gradientCenter,
+                        onTap: _call,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _QuickActionButton(
+                        icon: Icons.chat_rounded,
+                        label: S.of('whatsappSupport'),
+                        color: const Color(0xFF25D366),
+                        onTap: _openWhatsapp,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _QuickActionButton({required this.icon, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 6),
+            Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+          ],
         ),
       ),
     );
