@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/account.dart';
+import '../models/payment.dart';
 
 /// All backend calls go through this one place. Backend = the same
-/// Google Apps Script Web App used by the website (v9+).
+/// Google Apps Script Web App used by the website (v10+).
 class ApiService {
   ApiService._();
 
@@ -30,6 +31,22 @@ class ApiService {
       // ek googleusercontent.com URL pe hoti hai) — kuch Android network
       // stacks ise POST ke baad automatically follow nahi karte, isliye
       // manually follow karte hain.
+      final location = res.headers['location'];
+      if ((res.statusCode == 301 || res.statusCode == 302) && location != null) {
+        res = await client.get(Uri.parse(location)).timeout(const Duration(seconds: 25));
+      }
+
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } finally {
+      client.close();
+    }
+  }
+
+  static Future<Map<String, dynamic>> _get(Map<String, String> params) async {
+    final client = http.Client();
+    try {
+      var res = await client.get(_uri(params)).timeout(const Duration(seconds: 25));
+
       final location = res.headers['location'];
       if ((res.statusCode == 301 || res.statusCode == 302) && location != null) {
         res = await client.get(Uri.parse(location)).timeout(const Duration(seconds: 25));
@@ -78,10 +95,7 @@ class ApiService {
   /// call this whenever Home/Profile loads, so data is always live from the Sheet.
   static Future<Account?> refreshAccount(String userId) async {
     try {
-      final res = await http
-          .get(_uri({'action': 'customer', 'userId': userId}))
-          .timeout(const Duration(seconds: 20));
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final data = await _get({'action': 'customer', 'userId': userId});
       if (data['found'] == true) {
         return Account.fromJson(data);
       }
@@ -127,6 +141,21 @@ class ApiService {
       return null;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Fetches this account's payment history (latest first) — same
+  /// PaymentClaims sheet the admin verifies from.
+  static Future<List<Payment>> getPaymentHistory(String userId) async {
+    try {
+      final data = await _get({'action': 'paymentHistory', 'userId': userId});
+      if (data['found'] != true) return [];
+      final list = (data['history'] as List<dynamic>? ?? [])
+          .map((e) => Payment.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return list;
+    } catch (_) {
+      return [];
     }
   }
 }
