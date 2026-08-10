@@ -58,6 +58,11 @@ class S {
     'chooseAccount': {AppLang.en: 'Choose Account', AppLang.hi: 'खाता चुनें'},
     'userId': {AppLang.en: 'User ID', AppLang.hi: 'यूज़र आईडी'},
 
+    // Recent payment card + quick actions (Home)
+    'lastPayment': {AppLang.en: 'Last Payment', AppLang.hi: 'आख़िरी भुगतान'},
+    'viewAll': {AppLang.en: 'View All', AppLang.hi: 'सभी देखें'},
+    'callSupport': {AppLang.en: 'Call', AppLang.hi: 'कॉल करें'},
+
     // Recharge sheet
     'selectPlan': {AppLang.en: 'Select a Plan', AppLang.hi: 'प्लान चुनें'},
     'payNow': {AppLang.en: 'Pay Now', AppLang.hi: 'अभी भुगतान करें'},
@@ -82,6 +87,7 @@ class S {
     // Bottom nav
     'navHome': {AppLang.en: 'Home', AppLang.hi: 'होम'},
     'navSpeed': {AppLang.en: 'Speed Test', AppLang.hi: 'स्पीड टेस्ट'},
+    'navHistory': {AppLang.en: 'History', AppLang.hi: 'इतिहास'},
     'navProfile': {AppLang.en: 'Profile', AppLang.hi: 'प्रोफ़ाइल'},
 
     // Profile
@@ -103,6 +109,17 @@ class S {
 
     // Speed test
     'speedTestTitle': {AppLang.en: 'Speed Test', AppLang.hi: 'स्पीड टेस्ट'},
+    'speedTestLoadError': {
+      AppLang.en: 'Could not load speed test. Please check your internet connection.',
+      AppLang.hi: 'स्पीड टेस्ट लोड नहीं हो पाया। कृपया अपना इंटरनेट कनेक्शन जांचें।'
+    },
+    'retry': {AppLang.en: 'Retry', AppLang.hi: 'दोबारा प्रयास करें'},
+
+    // Payment History
+    'paymentHistory': {AppLang.en: 'Payment History', AppLang.hi: 'भुगतान इतिहास'},
+    'noPayments': {AppLang.en: 'No payments yet', AppLang.hi: 'अभी तक कोई भुगतान नहीं'},
+    'verified': {AppLang.en: 'Verified', AppLang.hi: 'सत्यापित'},
+    'pending': {AppLang.en: 'Pending', AppLang.hi: 'लंबित'},
 
     // Common
     'cancel': {AppLang.en: 'Cancel', AppLang.hi: 'रद्द करें'},
