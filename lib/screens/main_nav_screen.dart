@@ -5,14 +5,14 @@ import '../services/session_service.dart';
 import '../theme/app_colors.dart';
 import 'home_screen.dart';
 import 'speedtest_screen.dart';
+import 'history_screen.dart';
 import 'profile_screen.dart';
 
 /// Shell that owns the bottom navigation + the shared "which account is
 /// currently selected" state, so switching accounts on Home instantly
-/// reflects on Profile too.
+/// reflects on Profile/History too.
 class MainNavScreen extends StatefulWidget {
   const MainNavScreen({super.key});
-
   @override
   State<MainNavScreen> createState() => _MainNavScreenState();
 }
@@ -64,6 +64,8 @@ class _MainNavScreenState extends State<MainNavScreen> {
     SessionService.updateAccounts(updated);
   }
 
+  void _goToHistory() => setState(() => tabIndex = 2);
+
   @override
   Widget build(BuildContext context) {
     if (loading || selectedAccount == null || selectedAccount!.userId.isEmpty) {
@@ -78,8 +80,10 @@ class _MainNavScreenState extends State<MainNavScreen> {
         selectedAccount: selectedAccount!,
         onAccountChanged: onAccountChanged,
         onAccountsRefreshed: onAccountsRefreshed,
+        onViewHistory: _goToHistory,
       ),
       const SpeedTestScreen(),
+      HistoryScreen(account: selectedAccount!),
       ProfileScreen(account: selectedAccount!),
     ];
 
@@ -89,6 +93,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
         return Scaffold(
           body: IndexedStack(index: tabIndex, children: screens),
           bottomNavigationBar: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
             currentIndex: tabIndex,
             onTap: (i) => setState(() => tabIndex = i),
             items: [
@@ -99,6 +104,10 @@ class _MainNavScreenState extends State<MainNavScreen> {
               BottomNavigationBarItem(
                 icon: const Icon(Icons.speed_rounded),
                 label: S.of('navSpeed'),
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.receipt_long_rounded),
+                label: S.of('navHistory'),
               ),
               BottomNavigationBarItem(
                 icon: const Icon(Icons.person_rounded),
