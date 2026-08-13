@@ -109,11 +109,16 @@ class S {
 
     // Speed test
     'speedTestTitle': {AppLang.en: 'Speed Test', AppLang.hi: 'स्पीड टेस्ट'},
-    'speedTestLoadError': {
-      AppLang.en: 'Could not load speed test. Please check your internet connection.',
-      AppLang.hi: 'स्पीड टेस्ट लोड नहीं हो पाया। कृपया अपना इंटरनेट कनेक्शन जांचें।'
-    },
-    'retry': {AppLang.en: 'Retry', AppLang.hi: 'दोबारा प्रयास करें'},
+    'speedTestIdle': {AppLang.en: 'Tap start to test your speed', AppLang.hi: 'Speed test karne ke liye start dabayein'},
+    'speedTestPinging': {AppLang.en: 'Checking ping...', AppLang.hi: 'Ping check ho raha hai...'},
+    'speedTestDownloading': {AppLang.en: 'Testing download...', AppLang.hi: 'Download test ho raha hai...'},
+    'speedTestUploading': {AppLang.en: 'Testing upload...', AppLang.hi: 'Upload test ho raha hai...'},
+    'speedTestComplete': {AppLang.en: 'Test complete', AppLang.hi: 'Test poora hua'},
+    'speedTestStart': {AppLang.en: 'Start Test', AppLang.hi: 'Test Shuru Karein'},
+    'speedTestRunning': {AppLang.en: 'Testing...', AppLang.hi: 'Test ho raha hai...'},
+    'download': {AppLang.en: 'Download', AppLang.hi: 'Download'},
+    'upload': {AppLang.en: 'Upload', AppLang.hi: 'Upload'},
+    'ping': {AppLang.en: 'Ping', AppLang.hi: 'Ping'},
 
     // Payment History
     'paymentHistory': {AppLang.en: 'Payment History', AppLang.hi: 'भुगतान इतिहास'},
