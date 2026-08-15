@@ -9,6 +9,7 @@ import '../theme/app_colors.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/glass_text_field.dart';
 import '../widgets/language_toggle_button.dart';
+import '../widgets/animated_otp_verifier.dart';
 import 'main_nav_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -22,7 +23,6 @@ enum _Step { mobile, otp }
 
 class _LoginScreenState extends State<LoginScreen> {
   final _mobileCtrl = TextEditingController();
-  final _otpCtrl = TextEditingController();
   final _localAuth = LocalAuthentication();
 
   _Step step = _Step.mobile;
@@ -42,7 +42,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _cooldownTimer?.cancel();
     _mobileCtrl.dispose();
-    _otpCtrl.dispose();
     super.dispose();
   }
 
@@ -87,40 +86,31 @@ class _LoginScreenState extends State<LoginScreen> {
       _startCooldown();
     } else {
       setState(() {
-        error = result.message.contains('not linked') || result.message.isNotEmpty
-            ? (result.message.isNotEmpty ? result.message : S.of('notRegistered'))
-            : S.of('somethingWrong');
+        error = result.message.isNotEmpty ? result.message : S.of('somethingWrong');
       });
     }
   }
 
-  Future<void> _verifyOtp() async {
+  /// Called by the animated OTP widget once all 4 digits are entered.
+  /// Returns true only after the account data is fully saved, so the
+  /// widget's success animation and the real login are always in sync.
+  Future<bool> _handleOtpSubmit(String otp) async {
     final mobile = _mobileCtrl.text.trim();
-    final otp = _otpCtrl.text.trim();
-    if (otp.length != 6) {
-      setState(() => error = S.of('invalidOtp'));
-      return;
-    }
-    setState(() {
-      loading = true;
-      error = null;
-    });
-
     final result = await ApiService.verifyOtp(mobile, otp);
-
-    if (!mounted) return;
-    setState(() => loading = false);
 
     if (result.success && result.accounts.isNotEmpty) {
       await SessionService.saveLogin(mobile, result.accounts, photoUrl: result.photoUrl);
       await SessionService.rememberDeviceForBiometric(mobile, result.accounts);
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavScreen()),
-      );
-    } else {
-      setState(() => error = S.of('invalidOtp'));
+      return true;
     }
+    return false;
+  }
+
+  void _goToMainNav() {
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainNavScreen()),
+    );
   }
 
   Future<void> _biometricLogin() async {
@@ -253,27 +243,19 @@ class _LoginScreenState extends State<LoginScreen> {
     return [
       Text(S.of('enterOtp'),
           style: const TextStyle(color: AppColors.secondaryText, fontSize: 12, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 16),
+      AnimatedOtpVerifier(
+        length: 4,
+        onSubmit: _handleOtpSubmit,
+        onVerified: _goToMainNav,
+      ),
       const SizedBox(height: 8),
-      GlassTextField(
-        controller: _otpCtrl,
-        hint: '6-digit OTP',
-        keyboardType: TextInputType.number,
-        maxLength: 6,
-        prefixIcon: Icons.lock_outline_rounded,
-      ),
-      const SizedBox(height: 22),
-      _buildPrimaryButton(
-        label: S.of('verifyLogin'),
-        onTap: loading ? null : _verifyOtp,
-      ),
-      const SizedBox(height: 18),
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           TextButton(
             onPressed: () => setState(() {
               step = _Step.mobile;
-              _otpCtrl.clear();
               error = null;
             }),
             child: Text(S.of('changeNumber'),
