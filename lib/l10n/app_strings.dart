@@ -42,7 +42,9 @@ class S {
       AppLang.en: 'Enter a valid 10-digit mobile number',
       AppLang.hi: 'सही 10 अंकों का मोबाइल नंबर दर्ज करें'
     },
-    'invalidOtp': {AppLang.en: 'Incorrect OTP', AppLang.hi: 'गलत OTP'},
+    'invalidOtp': {AppLang.en: 'Incorrect code, try again', AppLang.hi: 'गलत OTP, दोबारा कोशिश करें'},
+    'verifying': {AppLang.en: 'VERIFYING', AppLang.hi: 'सत्यापित हो रहा है'},
+    'verifiedSuccess': {AppLang.en: 'Verified successfully', AppLang.hi: 'सफलतापूर्वक सत्यापित'},
     'notRegistered': {
       AppLang.en: 'This mobile number is not linked to any SHAN ZONE account.',
       AppLang.hi: 'यह मोबाइल नंबर किसी भी शान ज़ोन खाते से जुड़ा नहीं है।'
