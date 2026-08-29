@@ -20,13 +20,13 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      # 🔥 FIX: Delete old android/ and regenerate with v2 embedding
-      - name: Regenerate Android folder (fix v1 embedding)
+      # 🔥 Step 1: Regenerate Android folder (fix v1 embedding)
+      - name: Regenerate Android folder
         run: |
           rm -rf android/
           flutter create . --platforms=android --project-name shanzone_app
 
-      # 🔥 Restore custom AndroidManifest.xml and file_paths.xml
+      # 🔥 Step 2: Restore custom AndroidManifest.xml & file_paths.xml
       - name: Restore custom Android files
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
@@ -85,9 +85,15 @@ jobs:
           </paths>
           EOF
 
+      # 🔥 Step 3: Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
+      # 🔥 Step 4: Generate app icons (NEW)
+      - name: Generate app icons
+        run: flutter pub run flutter_launcher_icons:main
+
+      # 🔥 Step 5: Build APK
       - name: Build APK
         run: flutter build apk --release
 
