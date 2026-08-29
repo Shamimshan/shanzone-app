@@ -8,7 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'l10n/app_strings.dart';
-import 'screens/speedtest_screen.dart'; // ← replace with your actual home
+import 'screens/speedtest_screen.dart';
 import 'services/session_service.dart';
 import 'services/update_service.dart';
 import 'theme/app_theme.dart';
@@ -22,6 +22,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _updateChecked = false;
+
   @override
   void initState() {
     super.initState();
@@ -29,7 +31,9 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkForUpdates() async {
-    await Future.delayed(const Duration(seconds: 1));
+    // Splash screen ko kam se kam 2 second dikhao
+    await Future.delayed(const Duration(seconds: 2));
+
     final latestVersion = await UpdateService.checkForUpdate();
     if (latestVersion != null && mounted) {
       _showUpdateDialog(latestVersion);
@@ -60,7 +64,6 @@ class _SplashScreenState extends State<SplashScreen> {
           FilledButton(
             onPressed: () async {
               Navigator.pop(context);
-              // Show progress
               await _startDownload(version);
             },
             child: const Text('Update Now'),
@@ -88,15 +91,13 @@ class _SplashScreenState extends State<SplashScreen> {
     );
 
     final path = await UpdateService.downloadApk(version);
-    // Close progress dialog
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.pop(context); // close progress
 
     if (path != null) {
       final installed = await UpdateService.installApk(path);
       if (!installed && mounted) {
         _showErrorDialog('Installation failed. Please open the APK manually.');
       }
-      // If installed, the app will restart, so no need to navigate.
     } else {
       if (mounted) {
         _showErrorDialog(
@@ -128,19 +129,29 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _goToHome() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const SpeedTestScreen()),
-    );
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const SpeedTestScreen()),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.lightBlue.shade100,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // App logo – if you have an asset, use Image.asset; otherwise text
+            const Icon(
+              Icons.wifi,
+              size: 80,
+              color: Color(0xFF5D3AAE),
+            ),
+            const SizedBox(height: 20),
             const Text(
               'SHAN ZONE',
               style: TextStyle(
@@ -154,7 +165,7 @@ class _SplashScreenState extends State<SplashScreen> {
               'Broadband',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 30),
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
