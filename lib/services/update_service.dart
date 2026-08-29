@@ -8,16 +8,11 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 
 class UpdateService {
-  // ─── CONFIGURE THIS ────────────────────────────────────────
-  static const String _owner = 'Shamimshan';        // ← Your GitHub username
-  static const String _repo = 'shanzone-app';       // ← Your repo name
-  // ──────────────────────────────────────────────────────────
-
+  static const String _owner = 'Shamimshan';
+  static const String _repo = 'shanzone-app';
   static const String _apiUrl =
       'https://api.github.com/repos/$_owner/$_repo/releases/latest';
 
-  /// Check if a new version is available on GitHub.
-  /// Returns the latest version tag (e.g., "v1.0.2") or null.
   static Future<String?> checkForUpdate() async {
     try {
       final response = await http.get(Uri.parse(_apiUrl));
@@ -26,52 +21,74 @@ class UpdateService {
         final latestTag = data['tag_name'] as String;
         final currentVersion = await _getCurrentVersion();
         return _isNewerVersion(currentVersion, latestTag) ? latestTag : null;
+      } else {
+        debugPrint('⚠️ GitHub API returned ${response.statusCode}');
+        return null;
       }
-      return null;
     } catch (e) {
       debugPrint('❌ Update check failed: $e');
       return null;
     }
   }
 
-  /// Download the latest APK from GitHub Release.
   static Future<String?> downloadApk(String versionTag) async {
     try {
+      if (!await _requestStoragePermission()) {
+        debugPrint('❌ Storage permission denied');
+        return null;
+      }
+
       final releaseData = await _getReleaseData(versionTag);
-      if (releaseData == null) return null;
+      if (releaseData == null) {
+        debugPrint('❌ No release data for tag: $versionTag');
+        return null;
+      }
 
       final assets = releaseData['assets'] as List;
+      if (assets.isEmpty) {
+        debugPrint('❌ No assets in release');
+        return null;
+      }
+
       final apkAsset = assets.firstWhere(
         (asset) => (asset['name'] as String).endsWith('.apk'),
         orElse: () => null,
       );
       if (apkAsset == null) {
-        debugPrint('❌ No APK found in release $versionTag');
+        debugPrint('❌ No APK found in assets: $assets');
         return null;
       }
 
       final downloadUrl = apkAsset['browser_download_url'] as String;
-
-      if (!await _requestStoragePermission()) return null;
+      debugPrint('📥 Download URL: $downloadUrl');
 
       final directory = await getExternalStorageDirectory();
-      final filePath = '${directory!.path}/shanzone_$versionTag.apk';
+      if (directory == null) {
+        debugPrint('❌ Could not get external storage directory');
+        return null;
+      }
+      final filePath = '${directory.path}/shanzone_$versionTag.apk';
       final file = File(filePath);
+
+      if (await file.exists()) {
+        await file.delete();
+      }
 
       final response = await http.get(Uri.parse(downloadUrl));
       if (response.statusCode == 200) {
         await file.writeAsBytes(response.bodyBytes);
         debugPrint('✅ APK downloaded: $filePath');
         return filePath;
+      } else {
+        debugPrint('❌ Download failed with status ${response.statusCode}');
+        return null;
       }
-      return null;
     } catch (e) {
-      debugPrint('❌ Download failed: $e');
+      debugPrint('❌ Download exception: $e');
       return null;
     }
   }
 
-  /// Install the downloaded APK using the system installer.
   static Future<bool> installApk(String filePath) async {
     try {
       if (await Permission.requestInstallPackages.isDenied) {
@@ -89,11 +106,9 @@ class UpdateService {
     }
   }
 
-  // ─── Private Helpers ──────────────────────────────────────
-
   static Future<String> _getCurrentVersion() async {
     final info = await PackageInfo.fromPlatform();
-    return info.version; // e.g., "1.0.0"
+    return info.version;
   }
 
   static bool _isNewerVersion(String current, String latest) {
@@ -118,8 +133,10 @@ class UpdateService {
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      debugPrint('⚠️ Release API returned ${response.statusCode} for tag $tag');
+      return null;
     }
-    return null;
   }
 
   static Future<bool> _requestStoragePermission() async {
