@@ -18,6 +18,7 @@ dependencies:
   google_fonts: ^6.2.1            # Poppins across the app
   qr_flutter: ^4.1.0              # UPI QR code in the recharge sheet
   local_auth: ^2.3.0              # fingerprint quick-login for a remembered device
+  flutter_svg: ^2.0.9             # WiFi icon and other SVG assets (added for speed test)
 
 dev_dependencies:
   flutter_test:
