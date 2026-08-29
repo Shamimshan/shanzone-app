@@ -36,10 +36,9 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
   double _currentGauge = 0;
   bool testing = false;
 
-  // Shimmer for glossy button
+  // Shimmer for button
   late AnimationController _shimmerController;
-
-  // Gauge interpolation (runs every 16ms → 60fps)
+  // Gauge interpolation
   late AnimationController _gaugeController;
 
   @override
@@ -54,7 +53,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       vsync: this,
       duration: const Duration(milliseconds: 16),
     )..addListener(() {
-        // Lerp with factor 0.08 – exactly like your web version
         setState(() {
           _currentGauge += (_targetGauge - _currentGauge) * 0.08;
           if ((_currentGauge - _targetGauge).abs() < 0.005) {
@@ -151,7 +149,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       final elapsedSec = now.difference(measureStart!).inMilliseconds / 1000;
       if (elapsedSec > 0.05) {
         finalMbps = ((measuredBytes * 8) / 1e6) / elapsedSec;
-        // Update target gauge every ~100ms (like the web)
         if (now.difference(lastUiUpdate).inMilliseconds > 100 && mounted) {
           lastUiUpdate = now;
           setState(() {
@@ -171,7 +168,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
         }
       } else {
         final rnd = Random();
-        const chunkSize = 2000000; // 2 MB per chunk
+        const chunkSize = 2000000;
         while (DateTime.now().isBefore(testEnd)) {
           final bytes = Uint8List.fromList(
               List<int>.generate(chunkSize, (_) => rnd.nextInt(256)));
@@ -181,13 +178,13 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
           onChunk(bytes.length);
         }
       }
-    } catch (_) {
-      // ignore network hiccups – keep whatever we measured
+    } catch (e) {
+      debugPrint('⚠️ Throughput error: $e');
     } finally {
       client.close();
     }
 
-    // Fallback if no chunks were processed
+    // Fallback
     if (finalMbps == 0 && measuredBytes > 0) {
       final totalElapsed =
           DateTime.now().difference(overallStart).inMilliseconds / 1000;
@@ -224,7 +221,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       valueListenable: AppLocale.current,
       builder: (context, _, __) {
         return Scaffold(
-          backgroundColor: Colors.lightBlue.shade100, // sky blue
+          backgroundColor: Colors.lightBlue.shade100,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -322,7 +319,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                   ),
                   const SizedBox(height: 28),
 
-                  // ─── Result Cards (PING, DOWNLOAD, UPLOAD) ──
+                  // ─── Result Cards ──────────────────────────
                   Row(
                     children: [
                       Expanded(
@@ -434,14 +431,13 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
   }
 }
 
-// ─── Result Card Widget ────────────────────────────────────────
+// ─── Result Card ──────────────────────────────────────────────
 class _ResultCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final double value;
   final String unit;
   final Color color;
-
   const _ResultCard({
     required this.icon,
     required this.label,
@@ -500,18 +496,16 @@ class _ResultCard extends StatelessWidget {
   }
 }
 
-// ─── Gauge Custom Painter (with scale 0–1000) ──────────────
+// ─── Gauge Painter ────────────────────────────────────────────
 class _GaugePainter extends CustomPainter {
   final double value;
   final double maxValue;
   final Color color;
-
   const _GaugePainter({
     required this.value,
     required this.maxValue,
     required this.color,
   });
-
   static const double _startAngle = 150 * pi / 180;
   static const double _sweepAngle = 240 * pi / 180;
 
@@ -520,7 +514,6 @@ class _GaugePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = min(size.width, size.height) / 2 - 18;
 
-    // ── Background arc ──
     final bgPaint = Paint()
       ..color = AppColors.glassFillLight.withOpacity(0.5)
       ..style = PaintingStyle.stroke
@@ -534,7 +527,7 @@ class _GaugePainter extends CustomPainter {
       bgPaint,
     );
 
-    // ── Scale markings (0, 100, 200, … 1000) ──
+    // Scale markings
     final textStyle = GoogleFonts.poppins(
       color: AppColors.textDark,
       fontSize: 10,
@@ -549,8 +542,6 @@ class _GaugePainter extends CustomPainter {
     for (int v = 0; v <= 1000; v += 100) {
       final fraction = v / 1000;
       final angle = _startAngle + _sweepAngle * fraction;
-
-      // Tick line
       final innerR = radius - 4;
       final outerR = radius + 10;
       final x1 = center.dx + innerR * cos(angle);
@@ -564,8 +555,6 @@ class _GaugePainter extends CustomPainter {
           ..color = AppColors.textDark
           ..strokeWidth = 1.5,
       );
-
-      // Number
       final label = v.toString();
       textPainter.text = TextSpan(text: label, style: textStyle);
       textPainter.layout();
@@ -578,7 +567,7 @@ class _GaugePainter extends CustomPainter {
       );
     }
 
-    // ── Minor ticks every 50 ──
+    // Minor ticks
     for (int v = 50; v < 1000; v += 50) {
       if (v % 100 == 0) continue;
       final fraction = v / 1000;
@@ -598,7 +587,7 @@ class _GaugePainter extends CustomPainter {
       );
     }
 
-    // ── Glowing progress arc ──
+    // Progress arc
     final progress = maxValue == 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
     if (progress > 0) {
       final fgPaint = Paint()
@@ -618,7 +607,6 @@ class _GaugePainter extends CustomPainter {
         false,
         fgPaint,
       );
-      // sharper edge
       final fgPaintSharp = Paint()
         ..shader = SweepGradient(
           startAngle: _startAngle,
@@ -637,7 +625,7 @@ class _GaugePainter extends CustomPainter {
       );
     }
 
-    // ── Needle ──
+    // Needle
     final needleAngle = _startAngle + _sweepAngle * progress;
     final needleEnd = Offset(
       center.dx + (radius - 22) * cos(needleAngle),
@@ -652,7 +640,6 @@ class _GaugePainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
-    // sharp needle
     canvas.drawLine(
       center,
       needleEnd,
@@ -662,7 +649,7 @@ class _GaugePainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // ── Center cap ──
+    // Cap
     canvas.drawCircle(
       center,
       8,
@@ -684,7 +671,7 @@ class _GaugePainter extends CustomPainter {
       oldDelegate.color != color;
 }
 
-// ─── Helper: Color to Hex String ──────────────────────────────
+// ─── Helper: Color to Hex ──────────────────────────────────────
 extension ColorToHex on Color {
   String toHex() {
     return '#${(value & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0').substring(0, 6)}';
