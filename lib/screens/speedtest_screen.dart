@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart'; // add this dependency
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import '../l10n/app_strings.dart';
 import '../theme/app_colors.dart';
@@ -337,7 +337,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                               end: Alignment.bottomRight,
                               colors: [
                                 AppColors.gradientCenter,
-                                AppColors.gradientEnd,
+                                const Color(0xFFFF9FFC), // fixed: pink accent
                               ],
                             ),
                             boxShadow: [
