@@ -32,11 +32,19 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
   double downloadMbps = 0;
   double uploadMbps = 0;
   int pingMs = 0;
-  double gaugeMbps = 0; // live needle value
+
+  // ── Smooth gauge values ──────────────────────────────────────
+  double _targetGauge = 0;      // the raw speed from measurement
+  double _currentGauge = 0;     // interpolated value for smooth display
+
   bool testing = false;
 
-  // For glossy button shimmer
+  // Shimmer animation for glossy button
   late AnimationController _shimmerController;
+
+  // Controller for smooth gauge interpolation
+  late AnimationController _gaugeController;
+  double _lastGaugeUpdate = 0;
 
   @override
   void initState() {
@@ -45,11 +53,27 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
+
+    _gaugeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    )..addListener(() {
+        // Lerp towards target every tick
+        setState(() {
+          _currentGauge += (_targetGauge - _currentGauge) * 0.12;
+          // Clamp to avoid overshoot
+          if ((_currentGauge - _targetGauge).abs() < 0.01) {
+            _currentGauge = _targetGauge;
+          }
+        });
+      });
+    _gaugeController.repeat();
   }
 
   @override
   void dispose() {
     _shimmerController.dispose();
+    _gaugeController.dispose();
     super.dispose();
   }
 
@@ -62,7 +86,8 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       downloadMbps = 0;
       uploadMbps = 0;
       pingMs = 0;
-      gaugeMbps = 0;
+      _targetGauge = 0;
+      _currentGauge = 0;
     });
 
     await _measurePing();
@@ -73,7 +98,8 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     if (!mounted) return;
     setState(() {
       downloadMbps = d;
-      gaugeMbps = 0;
+      _targetGauge = 0;
+      _currentGauge = 0;
       phase = _Phase.upload;
     });
 
@@ -81,7 +107,8 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     if (!mounted) return;
     setState(() {
       uploadMbps = u;
-      gaugeMbps = 0;
+      _targetGauge = 0;
+      _currentGauge = 0;
       phase = _Phase.done;
       testing = false;
     });
@@ -126,9 +153,12 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       final elapsedSec = now.difference(measureStart!).inMilliseconds / 1000;
       if (elapsedSec > 0.05) {
         finalMbps = ((measuredBytes * 8) / 1e6) / elapsedSec;
-        if (now.difference(lastUiUpdate).inMilliseconds > 120 && mounted) {
+        // Update target gauge for smooth interpolation
+        if (now.difference(lastUiUpdate).inMilliseconds > 100 && mounted) {
           lastUiUpdate = now;
-          setState(() => gaugeMbps = finalMbps);
+          setState(() {
+            _targetGauge = finalMbps;
+          });
         }
       }
     }
@@ -154,9 +184,17 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
         }
       }
     } catch (_) {
-      // ignore network hiccups
+      // ignore network hiccups – keep whatever we measured
     } finally {
       client.close();
+    }
+
+    // Ensure we have at least something, even if no chunks were processed
+    if (finalMbps == 0 && measuredBytes > 0) {
+      final totalElapsed = DateTime.now().difference(overallStart).inMilliseconds / 1000;
+      if (totalElapsed > 0) {
+        finalMbps = ((measuredBytes * 8) / 1e6) / totalElapsed;
+      }
     }
 
     return finalMbps;
@@ -178,11 +216,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     }
   }
 
-  double get _currentGaugeValue {
-    if (phase == _Phase.download || phase == _Phase.upload) return gaugeMbps;
-    if (phase == _Phase.done) return uploadMbps;
-    return 0;
-  }
+  double get _displayGauge => _currentGauge;
 
   // ─── Build ────────────────────────────────────────────────────
   @override
@@ -191,7 +225,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       valueListenable: AppLocale.current,
       builder: (context, _, __) {
         return Scaffold(
-          backgroundColor: AppColors.surfaceLight, // light purple (theme)
+          backgroundColor: AppColors.surfaceLight,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -209,7 +243,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                   ),
                 ),
                 const SizedBox(width: 6),
-                // WiFi Icon (SVG) – using AppColors.textDark for stroke
                 SvgPicture.string(
                   '''
                   <svg viewBox="0 0 24 24" fill="none" stroke="${AppColors.textDark.toHex()}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -248,8 +281,8 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                     height: 280,
                     child: CustomPaint(
                       painter: _GaugePainter(
-                        value: _currentGaugeValue,
-                        maxValue: 1000, // fixed scale 0–1000
+                        value: _displayGauge,
+                        maxValue: 1000,
                         color: phase == _Phase.upload
                             ? AppColors.warning
                             : AppColors.gradientCenter,
@@ -259,7 +292,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              _currentGaugeValue.toStringAsFixed(1),
+                              _displayGauge.toStringAsFixed(1),
                               style: GoogleFonts.poppins(
                                 fontSize: 44,
                                 fontWeight: FontWeight.w800,
@@ -333,7 +366,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                         return Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(30),
-                            gradient: AppColors.brandGradient, // uses app gradient
+                            gradient: AppColors.brandGradient,
                             boxShadow: [
                               if (!testing)
                                 BoxShadow(
@@ -468,7 +501,7 @@ class _ResultCard extends StatelessWidget {
   }
 }
 
-// ─── Gauge Custom Painter (with scale markings) ──────────────
+// ─── Gauge Custom Painter ──────────────────────────────────────
 class _GaugePainter extends CustomPainter {
   final double value;
   final double maxValue;
@@ -502,7 +535,7 @@ class _GaugePainter extends CustomPainter {
       bgPaint,
     );
 
-    // ── Scale markings (0, 100, 200, … 1000) ──
+    // ── Scale markings ──
     final textStyle = GoogleFonts.poppins(
       color: AppColors.textDark,
       fontSize: 10,
@@ -517,8 +550,6 @@ class _GaugePainter extends CustomPainter {
     for (int v = 0; v <= 1000; v += 100) {
       final fraction = v / 1000;
       final angle = _startAngle + _sweepAngle * fraction;
-
-      // Tick line
       final innerR = radius - 4;
       final outerR = radius + 10;
       final x1 = center.dx + innerR * cos(angle);
@@ -532,8 +563,6 @@ class _GaugePainter extends CustomPainter {
           ..color = AppColors.textDark
           ..strokeWidth = 1.5,
       );
-
-      // Number
       final label = v.toString();
       textPainter.text = TextSpan(text: label, style: textStyle);
       textPainter.layout();
@@ -546,7 +575,7 @@ class _GaugePainter extends CustomPainter {
       );
     }
 
-    // ── Minor ticks every 50 ──
+    // Minor ticks every 50
     for (int v = 50; v < 1000; v += 50) {
       if (v % 100 == 0) continue;
       final fraction = v / 1000;
@@ -566,7 +595,7 @@ class _GaugePainter extends CustomPainter {
       );
     }
 
-    // ── Glowing progress arc ──
+    // ── Progress arc ──
     final progress = maxValue == 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
     if (progress > 0) {
       final fgPaint = Paint()
@@ -586,7 +615,7 @@ class _GaugePainter extends CustomPainter {
         false,
         fgPaint,
       );
-      // second pass for sharper edge
+      // sharper edge
       final fgPaintSharp = Paint()
         ..shader = SweepGradient(
           startAngle: _startAngle,
@@ -620,7 +649,6 @@ class _GaugePainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
-    // sharp needle
     canvas.drawLine(
       center,
       needleEnd,
@@ -652,7 +680,7 @@ class _GaugePainter extends CustomPainter {
       oldDelegate.color != color;
 }
 
-// ─── Helper extension to convert Color to hex string ─────────
+// ─── Helper: Color to Hex String ──────────────────────────────
 extension ColorToHex on Color {
   String toHex() {
     return '#${(value & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0').substring(0, 6)}';
