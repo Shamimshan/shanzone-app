@@ -22,8 +22,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  bool _updateChecked = false;
-
   @override
   void initState() {
     super.initState();
@@ -50,8 +48,7 @@ class _SplashScreenState extends State<SplashScreen> {
         title: const Text('🚀 Update Available'),
         content: Text(
           'Version **$version** is ready.\n\n'
-          'Would you like to download and install it now?\n'
-          '(Internet connection required)',
+          'Would you like to download and install it now?',
         ),
         actions: [
           TextButton(
@@ -74,24 +71,23 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _startDownload(String version) async {
-    // Show progress dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (context) => const AlertDialog(
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text('Downloading update $version...'),
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Downloading update...'),
           ],
         ),
       ),
     );
 
     final path = await UpdateService.downloadApk(version);
-    if (mounted) Navigator.pop(context); // close progress
+    if (mounted) Navigator.pop(context);
 
     if (path != null) {
       final installed = await UpdateService.installApk(path);
@@ -102,8 +98,7 @@ class _SplashScreenState extends State<SplashScreen> {
       if (mounted) {
         _showErrorDialog(
           'Failed to download the update.\n\n'
-          'Please check your internet connection and storage space.\n'
-          'You can also download the APK manually from the GitHub release.',
+          'Please check your internet connection and storage space.',
         );
       }
     }
@@ -145,7 +140,6 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // App logo – if you have an asset, use Image.asset; otherwise text
             const Icon(
               Icons.wifi,
               size: 80,
@@ -197,7 +191,7 @@ class ShanZoneApp extends StatelessWidget {
       title: 'SHAN ZONE',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const SplashScreen(),
+      home: const SplashScreen(), // ✅ Splash screen first
     );
   }
 }
