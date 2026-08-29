@@ -25,17 +25,22 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkForUpdates();
+    // Splash screen ko pehle dikhao, phir update check karo
+    Future.delayed(const Duration(seconds: 1), () {
+      _checkForUpdates();
+    });
   }
 
   Future<void> _checkForUpdates() async {
-    // Splash screen ko kam se kam 2 second dikhao
-    await Future.delayed(const Duration(seconds: 2));
-
-    final latestVersion = await UpdateService.checkForUpdate();
-    if (latestVersion != null && mounted) {
-      _showUpdateDialog(latestVersion);
-    } else {
+    try {
+      final latestVersion = await UpdateService.checkForUpdate();
+      if (latestVersion != null && mounted) {
+        _showUpdateDialog(latestVersion);
+      } else {
+        _goToHome();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Update check error: $e');
       _goToHome();
     }
   }
@@ -162,11 +167,9 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 30),
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text(
-              AppLocale.current.value == 'hi'
-                  ? 'जाँच हो रही है...'
-                  : 'Checking for updates...',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            const Text(
+              'Loading...',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
           ],
         ),
@@ -178,6 +181,7 @@ class _SplashScreenState extends State<SplashScreen> {
 // ─── Main ──────────────────────────────────────────────────
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Language load
   AppLocale.current.value = await SessionService.getLang();
   runApp(const ShanZoneApp());
 }
@@ -191,7 +195,7 @@ class ShanZoneApp extends StatelessWidget {
       title: 'SHAN ZONE',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const SplashScreen(), // ✅ Splash screen first
+      home: const SplashScreen(),
     );
   }
 }
