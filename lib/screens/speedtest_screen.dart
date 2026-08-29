@@ -2,37 +2,59 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart'; // add this dependency
 import 'package:http/http.dart' as http;
 import '../l10n/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../widgets/language_toggle_button.dart';
 
-// Ye poora test app ke andar hi (native Dart code se) chalta hai —
-// koi website load nahi hoti. Cloudflare ke free, public speed-test
-// endpoints use kiye hain (yahi endpoints kai popular speed-test apps
-// use karte hain — koi apna server chahiye nahi).
-const String _downloadUrl = 'https://speed.cloudflare.com/__down?bytes=100000000';
+// ─── Constants ────────────────────────────────────────────────
+const String _downloadUrl =
+    'https://speed.cloudflare.com/__down?bytes=100000000';
 const String _uploadUrl = 'https://speed.cloudflare.com/__up';
-const int _warmupMs = 700;   // shuru ke chhote burst ko ignore karte hain (zyada accurate result)
-const int _measureMs = 4000; // itni der actual measurement hoti hai (download/upload, alag-alag)
+const int _warmupMs = 700;   // ignore initial burst
+const int _measureMs = 4000; // actual measurement duration
 
 enum _Phase { idle, ping, download, upload, done }
 
+// ─── Main Screen ──────────────────────────────────────────────
 class SpeedTestScreen extends StatefulWidget {
   const SpeedTestScreen({super.key});
+
   @override
   State<SpeedTestScreen> createState() => _SpeedTestScreenState();
 }
 
-class _SpeedTestScreenState extends State<SpeedTestScreen> {
+class _SpeedTestScreenState extends State<SpeedTestScreen>
+    with SingleTickerProviderStateMixin {
   _Phase phase = _Phase.idle;
   double downloadMbps = 0;
   double uploadMbps = 0;
   int pingMs = 0;
-  double gaugeMbps = 0; // test chalte waqt live sui/needle value
+  double gaugeMbps = 0; // live needle value
   bool testing = false;
 
+  // For glossy button shimmer
+  late AnimationController _shimmerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  // ─── Test Flow ──────────────────────────────────────────────
   Future<void> _start() async {
+    if (testing) return;
     setState(() {
       testing = true;
       phase = _Phase.ping;
@@ -64,6 +86,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
     });
   }
 
+  // ─── Ping ────────────────────────────────────────────────────
   Future<void> _measurePing() async {
     final samples = <int>[];
     for (var i = 0; i < 3; i++) {
@@ -74,16 +97,15 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
             .timeout(const Duration(seconds: 5));
         sw.stop();
         samples.add(sw.elapsedMilliseconds);
-      } catch (_) {
-        // ek sample fail ho jaaye toh bhi test aage badhta rahega
-      }
+      } catch (_) {}
     }
     if (samples.isNotEmpty && mounted) {
       samples.sort();
-      setState(() => pingMs = samples[samples.length ~/ 2]); // median value
+      setState(() => pingMs = samples[samples.length ~/ 2]);
     }
   }
 
+  // ─── Throughput (Download / Upload) ─────────────────────────
   Future<double> _measureThroughput({required bool isUpload}) async {
     final client = http.Client();
     final overallStart = DateTime.now();
@@ -103,8 +125,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
       final elapsedSec = now.difference(measureStart!).inMilliseconds / 1000;
       if (elapsedSec > 0.05) {
         finalMbps = ((measuredBytes * 8) / 1e6) / elapsedSec;
-        // Live gauge sirf har ~120ms me update hoti hai — bahut zyada
-        // baar setState() call karne se needle jhatke khaayegi.
         if (now.difference(lastUiUpdate).inMilliseconds > 120 && mounted) {
           lastUiUpdate = now;
           setState(() => gaugeMbps = finalMbps);
@@ -122,9 +142,10 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
         }
       } else {
         final rnd = Random();
-        const chunkSize = 2000000; // 2 MB per upload chunk
+        const chunkSize = 2000000; // 2 MB per chunk
         while (DateTime.now().isBefore(testEnd)) {
-          final bytes = Uint8List.fromList(List<int>.generate(chunkSize, (_) => rnd.nextInt(256)));
+          final bytes = Uint8List.fromList(
+              List<int>.generate(chunkSize, (_) => rnd.nextInt(256)));
           await client
               .post(Uri.parse(_uploadUrl), body: bytes)
               .timeout(const Duration(seconds: 10));
@@ -132,7 +153,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
         }
       }
     } catch (_) {
-      // Network hiccup ho jaaye toh bhi jo tak measure hua wahi final result maan lete hain
+      // ignore network hiccups
     } finally {
       client.close();
     }
@@ -140,6 +161,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
     return finalMbps;
   }
 
+  // ─── UI Helpers ──────────────────────────────────────────────
   String get _phaseLabel {
     switch (phase) {
       case _Phase.idle:
@@ -157,29 +179,50 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
 
   double get _currentGaugeValue {
     if (phase == _Phase.download || phase == _Phase.upload) return gaugeMbps;
-    if (phase == _Phase.done) return phase == _Phase.done ? uploadMbps : 0;
+    if (phase == _Phase.done) return uploadMbps;
     return 0;
   }
 
-  Color get _gaugeColor {
-    if (phase == _Phase.upload) return const Color(0xFFFFA31A);
-    return AppColors.gradientCenter;
-  }
-
+  // ─── Build ────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<AppLang>(
       valueListenable: AppLocale.current,
       builder: (context, _, __) {
         return Scaffold(
-          backgroundColor: AppColors.surfaceLight,
+          backgroundColor: Colors.lightBlue.shade100, // sky blue
           appBar: AppBar(
-            backgroundColor: AppColors.gradientCenter,
+            backgroundColor: Colors.transparent,
             elevation: 0,
             automaticallyImplyLeading: false,
-            title: Text(
-              S.of('speedTestTitle'),
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'SHAN ZONE',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: Color(0xFF1a1a2e),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // WiFi Icon (SVG)
+                SvgPicture.string(
+                  '''
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12.55a10.94 10.94 0 0 1 14.08 0" />
+                    <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                    <path d="M8.53 16.11a6 6 0 0 1 6.94 0" />
+                    <circle cx="12" cy="20" r="1.5" fill="#1a1a2e" stroke="none" />
+                  </svg>
+                  ''',
+                  width: 24,
+                  height: 24,
+                  fit: BoxFit.contain,
+                ),
+              ],
             ),
             actions: const [
               Padding(
@@ -198,14 +241,17 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
               padding: const EdgeInsets.fromLTRB(24, 30, 24, 30),
               child: Column(
                 children: [
+                  // ─── Gauge ──────────────────────────────────
                   SizedBox(
-                    width: 260,
-                    height: 260,
+                    width: 280,
+                    height: 280,
                     child: CustomPaint(
                       painter: _GaugePainter(
                         value: _currentGaugeValue,
-                        maxValue: max(100, (_currentGaugeValue * 1.3).ceilToDouble()),
-                        color: _gaugeColor,
+                        maxValue: 1000, // fixed scale 0–1000
+                        color: phase == _Phase.upload
+                            ? const Color(0xFFFFA31A)
+                            : AppColors.gradientCenter,
                       ),
                       child: Center(
                         child: Column(
@@ -216,18 +262,34 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
                               style: const TextStyle(
                                 fontSize: 44,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.textDark,
+                                color: Color(0xFF1a1a2e),
                               ),
                             ),
-                            const Text('Mbps', style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
+                            const Text(
+                              'Mbps',
+                              style: TextStyle(
+                                color: Color(0xFF2d2d44),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             const SizedBox(height: 6),
-                            Text(_phaseLabel, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                            Text(
+                              _phaseLabel,
+                              style: const TextStyle(
+                                color: Color(0xFF2d2d44),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 28),
+
+                  // ─── Result Cards ──────────────────────────
                   Row(
                     children: [
                       Expanded(
@@ -260,27 +322,79 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
                     ],
                   ),
                   const SizedBox(height: 30),
+
+                  // ─── Glossy START Button ────────────────────
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: testing ? null : _start,
-                      icon: testing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.bolt_rounded),
-                      label: Text(
-                        testing ? S.of('speedTestRunning') : S.of('speedTestStart'),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.gradientCenter,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
+                    child: AnimatedBuilder(
+                      animation: _shimmerController,
+                      builder: (context, child) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppColors.gradientCenter,
+                                AppColors.gradientEnd,
+                              ],
+                            ),
+                            boxShadow: [
+                              if (!testing)
+                                BoxShadow(
+                                  color: AppColors.gradientCenter
+                                      .withOpacity(0.5),
+                                  blurRadius: 30,
+                                  spreadRadius: 2,
+                                ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: testing ? null : _start,
+                            icon: testing
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.bolt_rounded),
+                            label: Text(
+                              testing
+                                  ? S.of('speedTestRunning')
+                                  : S.of('speedTestStart'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 18,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+                  Text(
+                    'Powered by SHAN ZONE Core Network',
+                    style: TextStyle(
+                      color: const Color(0xFF2d2d44).withOpacity(0.7),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -293,12 +407,14 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
   }
 }
 
+// ─── Result Card Widget ────────────────────────────────────────
 class _ResultCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final double value;
   final String unit;
   final Color color;
+
   const _ResultCard({
     required this.icon,
     required this.label,
@@ -312,32 +428,62 @@ class _ResultCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: AppColors.shadowColor, blurRadius: 12, offset: const Offset(0, 5))],
+        color: Colors.white.withOpacity(0.85),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 18),
+          Icon(icon, color: color, size: 20),
           const SizedBox(height: 6),
           Text(
             value == 0 ? '--' : value.toStringAsFixed(unit == 'ms' ? 0 : 1),
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textDark),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1a1a2e),
+            ),
           ),
-          Text(unit, style: const TextStyle(fontSize: 9.5, color: AppColors.textMuted)),
+          Text(
+            unit,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF2d2d44),
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: Color(0xFF2d2d44),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
+// ─── Gauge Custom Painter (with scale markings) ──────────────
 class _GaugePainter extends CustomPainter {
   final double value;
   final double maxValue;
   final Color color;
-  _GaugePainter({required this.value, required this.maxValue, required this.color});
+
+  _GaugePainter({
+    required this.value,
+    required this.maxValue,
+    required this.color,
+  });
 
   static const double _startAngle = 150 * pi / 180;
   static const double _sweepAngle = 240 * pi / 180;
@@ -345,43 +491,170 @@ class _GaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = min(size.width, size.height) / 2 - 14;
+    final radius = min(size.width, size.height) / 2 - 18;
 
+    // ── Background arc ──
     final bgPaint = Paint()
-      ..color = const Color(0xFFE9E3F7)
+      ..color = Colors.white.withOpacity(0.5)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 16
+      ..strokeWidth = 14
       ..strokeCap = StrokeCap.round;
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), _startAngle, _sweepAngle, false, bgPaint);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      _startAngle,
+      _sweepAngle,
+      false,
+      bgPaint,
+    );
 
+    // ── Scale markings (0, 100, 200, … 1000) ──
+    final textStyle = TextStyle(
+      color: const Color(0xFF1a1a2e),
+      fontSize: 10,
+      fontWeight: FontWeight.w600,
+      fontFamily: 'Orbitron',
+    );
+    final textSpan = TextSpan(text: '', style: textStyle);
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    );
+
+    for (int v = 0; v <= 1000; v += 100) {
+      final fraction = v / 1000;
+      final angle = _startAngle + _sweepAngle * fraction;
+
+      // Tick line
+      final innerR = radius - 4;
+      final outerR = radius + 10;
+      final x1 = center.dx + innerR * cos(angle);
+      final y1 = center.dy + innerR * sin(angle);
+      final x2 = center.dx + outerR * cos(angle);
+      final y2 = center.dy + outerR * sin(angle);
+      canvas.drawLine(
+        Offset(x1, y1),
+        Offset(x2, y2),
+        Paint()
+          ..color = const Color(0xFF1a1a2e)
+          ..strokeWidth = 1.5,
+      );
+
+      // Number
+      final label = v.toString();
+      textPainter.text = TextSpan(text: label, style: textStyle);
+      textPainter.layout();
+      final textR = radius + 24;
+      final tx = center.dx + textR * cos(angle);
+      final ty = center.dy + textR * sin(angle);
+      textPainter.paint(
+        canvas,
+        Offset(tx - textPainter.width / 2, ty - textPainter.height / 2),
+      );
+    }
+
+    // ── Minor ticks every 50 ──
+    for (int v = 50; v < 1000; v += 50) {
+      if (v % 100 == 0) continue;
+      final fraction = v / 1000;
+      final angle = _startAngle + _sweepAngle * fraction;
+      final innerR = radius - 2;
+      final outerR = radius + 6;
+      final x1 = center.dx + innerR * cos(angle);
+      final y1 = center.dy + innerR * sin(angle);
+      final x2 = center.dx + outerR * cos(angle);
+      final y2 = center.dy + outerR * sin(angle);
+      canvas.drawLine(
+        Offset(x1, y1),
+        Offset(x2, y2),
+        Paint()
+          ..color = const Color(0xFF1a1a2e)
+          ..strokeWidth = 1,
+      );
+    }
+
+    // ── Glowing progress arc ──
     final progress = maxValue == 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
     if (progress > 0) {
       final fgPaint = Paint()
         ..shader = SweepGradient(
           startAngle: _startAngle,
           endAngle: _startAngle + _sweepAngle,
-          colors: [color.withOpacity(0.45), color],
+          colors: [color.withOpacity(0.4), color],
         ).createShader(Rect.fromCircle(center: center, radius: radius))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 16
+        ..strokeWidth = 14
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        _startAngle,
+        _sweepAngle * progress,
+        false,
+        fgPaint,
+      );
+      // second pass for sharper edge
+      final fgPaintSharp = Paint()
+        ..shader = SweepGradient(
+          startAngle: _startAngle,
+          endAngle: _startAngle + _sweepAngle,
+          colors: [color.withOpacity(0.6), color],
+        ).createShader(Rect.fromCircle(center: center, radius: radius))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 14
         ..strokeCap = StrokeCap.round;
-      canvas.drawArc(Rect.fromCircle(center: center, radius: radius), _startAngle, _sweepAngle * progress, false, fgPaint);
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        _startAngle,
+        _sweepAngle * progress,
+        false,
+        fgPaintSharp,
+      );
     }
 
+    // ── Needle ──
     final needleAngle = _startAngle + _sweepAngle * progress;
     final needleEnd = Offset(
       center.dx + (radius - 22) * cos(needleAngle),
       center.dy + (radius - 22) * sin(needleAngle),
     );
-    final needlePaint = Paint()
-      ..color = AppColors.textDark
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(center, needleEnd, needlePaint);
-    canvas.drawCircle(center, 6, Paint()..color = color);
+    canvas.drawLine(
+      center,
+      needleEnd,
+      Paint()
+        ..color = const Color(0xFF1a1a2e)
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    // sharp needle
+    canvas.drawLine(
+      center,
+      needleEnd,
+      Paint()
+        ..color = const Color(0xFF1a1a2e)
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // ── Center cap ──
+    canvas.drawCircle(
+      center,
+      8,
+      Paint()
+        ..color = color
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    canvas.drawCircle(
+      center,
+      6,
+      Paint()..color = color,
+    );
   }
 
   @override
   bool shouldRepaint(covariant _GaugePainter oldDelegate) =>
-      oldDelegate.value != value || oldDelegate.maxValue != maxValue || oldDelegate.color != color;
+      oldDelegate.value != value ||
+      oldDelegate.maxValue != maxValue ||
+      oldDelegate.color != color;
 }
