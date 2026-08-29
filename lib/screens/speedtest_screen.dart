@@ -13,8 +13,8 @@ import '../widgets/language_toggle_button.dart';
 const String _downloadUrl =
     'https://speed.cloudflare.com/__down?bytes=100000000';
 const String _uploadUrl = 'https://speed.cloudflare.com/__up';
-const int _warmupMs = 700;   // ignore initial burst
-const int _measureMs = 4000; // actual measurement duration
+const int _warmupMs = 700;
+const int _measureMs = 4000;
 
 enum _Phase { idle, ping, download, upload, done }
 
@@ -36,9 +36,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
   double _currentGauge = 0;
   bool testing = false;
 
-  // Shimmer for button
   late AnimationController _shimmerController;
-  // Gauge interpolation
   late AnimationController _gaugeController;
 
   @override
@@ -70,7 +68,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     super.dispose();
   }
 
-  // ─── Test Flow: PING → DOWNLOAD → UPLOAD ──────────────────
   Future<void> _start() async {
     if (testing) return;
     setState(() {
@@ -83,11 +80,9 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       _currentGauge = 0;
     });
 
-    // 1. PING
     await _measurePing();
     if (!mounted) return;
 
-    // 2. DOWNLOAD
     setState(() => phase = _Phase.download);
     final d = await _measureThroughput(isUpload: false);
     if (!mounted) return;
@@ -98,7 +93,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       phase = _Phase.upload;
     });
 
-    // 3. UPLOAD
     final u = await _measureThroughput(isUpload: true);
     if (!mounted) return;
     setState(() {
@@ -110,7 +104,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     });
   }
 
-  // ─── Ping ────────────────────────────────────────────────────
   Future<void> _measurePing() async {
     final samples = <int>[];
     for (var i = 0; i < 3; i++) {
@@ -129,7 +122,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     }
   }
 
-  // ─── Throughput (Download / Upload) ─────────────────────────
   Future<double> _measureThroughput({required bool isUpload}) async {
     final client = http.Client();
     final overallStart = DateTime.now();
@@ -184,7 +176,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       client.close();
     }
 
-    // Fallback
     if (finalMbps == 0 && measuredBytes > 0) {
       final totalElapsed =
           DateTime.now().difference(overallStart).inMilliseconds / 1000;
@@ -196,7 +187,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     return finalMbps;
   }
 
-  // ─── UI Helpers ──────────────────────────────────────────────
   String get _phaseLabel {
     switch (phase) {
       case _Phase.idle:
@@ -214,7 +204,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
 
   double get _displayGauge => _currentGauge;
 
-  // ─── Build ────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<AppLang>(
@@ -271,7 +260,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
               padding: const EdgeInsets.fromLTRB(24, 30, 24, 30),
               child: Column(
                 children: [
-                  // ─── Gauge ──────────────────────────────────
                   SizedBox(
                     width: 280,
                     height: 280,
@@ -318,8 +306,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                     ),
                   ),
                   const SizedBox(height: 28),
-
-                  // ─── Result Cards ──────────────────────────
                   Row(
                     children: [
                       Expanded(
@@ -352,8 +338,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                     ],
                   ),
                   const SizedBox(height: 30),
-
-                  // ─── Glossy START Button ────────────────────
                   SizedBox(
                     width: double.infinity,
                     child: AnimatedBuilder(
@@ -411,7 +395,6 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                       },
                     ),
                   ),
-
                   const SizedBox(height: 20),
                   Text(
                     'Powered by SHAN ZONE Core Network',
@@ -527,7 +510,6 @@ class _GaugePainter extends CustomPainter {
       bgPaint,
     );
 
-    // Scale markings
     final textStyle = GoogleFonts.poppins(
       color: AppColors.textDark,
       fontSize: 10,
@@ -567,7 +549,6 @@ class _GaugePainter extends CustomPainter {
       );
     }
 
-    // Minor ticks
     for (int v = 50; v < 1000; v += 50) {
       if (v % 100 == 0) continue;
       final fraction = v / 1000;
@@ -587,7 +568,6 @@ class _GaugePainter extends CustomPainter {
       );
     }
 
-    // Progress arc
     final progress = maxValue == 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
     if (progress > 0) {
       final fgPaint = Paint()
@@ -625,7 +605,6 @@ class _GaugePainter extends CustomPainter {
       );
     }
 
-    // Needle
     final needleAngle = _startAngle + _sweepAngle * progress;
     final needleEnd = Offset(
       center.dx + (radius - 22) * cos(needleAngle),
@@ -649,7 +628,6 @@ class _GaugePainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // Cap
     canvas.drawCircle(
       center,
       8,
@@ -671,7 +649,6 @@ class _GaugePainter extends CustomPainter {
       oldDelegate.color != color;
 }
 
-// ─── Helper: Color to Hex ──────────────────────────────────────
 extension ColorToHex on Color {
   String toHex() {
     return '#${(value & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0').substring(0, 6)}';
