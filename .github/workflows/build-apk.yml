@@ -1,68 +1,57 @@
-name: Build APK
+name: Build & Release APK
 
-# GitHub ke "Actions" tab se manually run karein ("Run workflow" button),
-# ya har baar jab aap "main" branch pe push karein toh apne aap chalega.
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    tags:
+      - 'v*'  # Triggers on tags like v1.0.0, v1.0.1, etc.
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to create releases
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version: '3.22.0'
 
-      - name: Generate missing Android platform files
-        run: flutter create . --platforms=android --project-name shanzone_app
-
-      - name: Add permissions + queries (Internet, Biometric, https/tel/upi launch, WhatsApp visibility)
-        run: |
-          cat > /tmp/manifest_insert.xml << 'MANIFESTEOF'
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-              <queries>
-                  <intent>
-                      <action android:name="android.intent.action.VIEW" />
-                      <data android:scheme="https" />
-                  </intent>
-                  <intent>
-                      <action android:name="android.intent.action.DIAL" />
-                      <data android:scheme="tel" />
-                  </intent>
-                  <intent>
-                      <action android:name="android.intent.action.VIEW" />
-                      <data android:scheme="upi" />
-                  </intent>
-                  <package android:name="com.whatsapp" />
-              </queries>
-          MANIFESTEOF
-          sed -i '/<manifest /r /tmp/manifest_insert.xml' android/app/src/main/AndroidManifest.xml
-
-      - name: Set app display name to "SHAN ZONE"
-        run: |
-          sed -i 's/android:label="[^"]*"/android:label="SHAN ZONE"/' android/app/src/main/AndroidManifest.xml
-
-      - name: Enable fingerprint support (MainActivity must extend FlutterFragmentActivity)
-        run: |
-          MAINACTIVITY=$(find android -name "MainActivity.kt")
-          sed -i 's/FlutterActivity/FlutterFragmentActivity/g' "$MAINACTIVITY"
-
-      - name: Get dependencies
+      - name: Install dependencies
         run: flutter pub get
-
-      - name: Generate custom app launcher icon
-        run: dart run flutter_launcher_icons
 
       - name: Build APK
         run: flutter build apk --release
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Rename APK
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             shanzone_app_${{ github.ref_name }}.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: shanzone-app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          files: shanzone_app_${{ github.ref_name }}.apk
+          tag_name: ${{ github.ref_name }}
+          name: "SHAN ZONE ${{ github.ref_name }}"
+          body: |
+            ## 🚀 SHAN ZONE App – Version ${{ github.ref_name }}
+
+            ### What's New
+            - Auto-generated release from GitHub Actions
+            - Download the APK below and install it.
+
+            ### Installation
+            1. Download the APK from the assets below
+            2. Open the file on your Android device
+            3. Tap "Install" (allow "Install from unknown sources" if prompted)
+
+            ### Changelog
+            See commit history for full changes.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
