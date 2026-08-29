@@ -12,21 +12,20 @@ dependencies:
   cupertino_icons: ^1.0.6
 
   # ── Existing dependencies ──────────────────────────────────
-  http: ^1.2.1                    # Apps Script API calls + native speed test
+  http: ^1.2.1                    # Apps Script API calls + speed test
   shared_preferences: ^2.2.3      # local session / remembered device
-  image_picker: ^1.1.2            # profile photo (camera/gallery)
-  url_launcher: ^6.3.0            # UPI payment intent + WhatsApp/Call
-  google_fonts: ^6.2.1            # Poppins across the app
-  qr_flutter: ^4.1.0              # UPI QR code in the recharge sheet
-  local_auth: ^2.3.0              # fingerprint quick-login for a remembered device
-  flutter_svg: ^2.0.9             # WiFi icon and other SVG assets
+  image_picker: ^1.1.2            # profile photo
+  url_launcher: ^6.3.0            # UPI payment + WhatsApp/Call
+  google_fonts: ^6.2.1            # Poppins font
+  qr_flutter: ^4.1.0              # UPI QR code
+  local_auth: ^2.3.0              # fingerprint login
+  flutter_svg: ^2.0.9             # WiFi icon
 
-  # ── Auto‑update dependencies (new) ────────────────────────
-  package_info_plus: ^5.0.1       # get current app version
-  permission_handler: ^11.3.0     # request storage & install permissions
-  open_file: ^3.3.2               # open downloaded APK with system installer
-  path_provider: ^2.1.0           # get external storage directory
-  flutter_downloader: ^1.11.0     # (optional) download APK with progress
+  # ── Auto‑update dependencies (fixed versions) ──────────────
+  package_info_plus: ^8.0.0       # 🔄 upgraded to resolve conflict
+  permission_handler: ^11.3.0     # storage & install permissions
+  open_file: ^3.3.2               # open APK with system installer
+  path_provider: ^2.1.0           # external storage directory
 
 dev_dependencies:
   flutter_test:
