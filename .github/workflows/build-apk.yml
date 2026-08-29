@@ -3,13 +3,13 @@ name: Build & Release APK
 on:
   push:
     tags:
-      - 'v*'  # Triggers on tags like v1.0.0, v1.0.1, etc.
+      - 'v*'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Required to create releases
+      contents: write
 
     steps:
       - name: Checkout code
@@ -20,6 +20,71 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
+      # 🔥 FIX: Delete old android/ and regenerate with v2 embedding
+      - name: Regenerate Android folder (fix v1 embedding)
+        run: |
+          rm -rf android/
+          flutter create . --platforms=android --project-name shanzone_app
+
+      # 🔥 Restore custom AndroidManifest.xml and file_paths.xml
+      - name: Restore custom Android files
+        run: |
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+            <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+            <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+            <application
+                android:label="SHAN ZONE"
+                android:icon="@mipmap/ic_launcher"
+                android:requestLegacyExternalStorage="true"
+                tools:targetApi="29">
+              <activity
+                  android:name=".MainActivity"
+                  android:exported="true"
+                  android:launchMode="singleTop"
+                  android:theme="@style/LaunchTheme"
+                  android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                  android:hardwareAccelerated="true"
+                  android:windowSoftInputMode="adjustResize">
+                <meta-data
+                    android:name="flutterEmbedding"
+                    android:value="2" />
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
+                </intent-filter>
+              </activity>
+              <provider
+                  android:name="androidx.core.content.FileProvider"
+                  android:authorities="${applicationId}.fileprovider"
+                  android:exported="false"
+                  android:grantUriPermissions="true">
+                <meta-data
+                    android:name="android.support.FILE_PROVIDER_PATHS"
+                    android:resource="@xml/file_paths" />
+              </provider>
+              <meta-data
+                  android:name="flutterEmbedding"
+                  android:value="2" />
+            </application>
+          </manifest>
+          EOF
+
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/file_paths.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths>
+            <external-path name="external" path="." />
+            <external-files-path name="external_files" path="." />
+            <cache-path name="cache" path="." />
+            <external-cache-path name="external_cache" path="." />
+            <files-path name="files" path="." />
+          </paths>
+          EOF
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -27,9 +92,7 @@ jobs:
         run: flutter build apk --release
 
       - name: Rename APK
-        run: |
-          mv build/app/outputs/flutter-apk/app-release.apk \
-             shanzone_app_${{ github.ref_name }}.apk
+        run: mv build/app/outputs/flutter-apk/app-release.apk shanzone_app_${{ github.ref_name }}.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -39,18 +102,8 @@ jobs:
           name: "SHAN ZONE ${{ github.ref_name }}"
           body: |
             ## 🚀 SHAN ZONE App – Version ${{ github.ref_name }}
-
-            ### What's New
-            - Auto-generated release from GitHub Actions
-            - Download the APK below and install it.
-
-            ### Installation
-            1. Download the APK from the assets below
-            2. Open the file on your Android device
-            3. Tap "Install" (allow "Install from unknown sources" if prompted)
-
-            ### Changelog
-            See commit history for full changes.
+            - APK attached below
+            - Install and enjoy!
           draft: false
           prerelease: false
         env:
