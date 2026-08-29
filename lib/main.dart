@@ -10,118 +10,8 @@ import 'dart:io';
 import 'l10n/app_strings.dart';
 import 'screens/speedtest_screen.dart'; // ← Replace with your actual home screen
 import 'services/session_service.dart';
+import 'services/update_service.dart';
 import 'theme/app_theme.dart';
-
-// ─── Update Service (inline for simplicity) ──────────────────
-class UpdateService {
-  static const String _owner = 'YOUR_GITHUB_USERNAME'; // ⚠️ CHANGE THIS
-  static const String _repo = 'shanzone_app';
-  static const String _apiUrl =
-      'https://api.github.com/repos/$_owner/$_repo/releases/latest';
-
-  static Future<String?> checkForUpdate() async {
-    try {
-      final response = await http.get(Uri.parse(_apiUrl));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final latestTag = data['tag_name'] as String;
-        final currentVersion = await _getCurrentVersion();
-        return _isNewerVersion(currentVersion, latestTag) ? latestTag : null;
-      }
-      return null;
-    } catch (e) {
-      debugPrint('❌ Update check failed: $e');
-      return null;
-    }
-  }
-
-  static Future<String?> downloadApk(String versionTag) async {
-    try {
-      final releaseData = await _getReleaseData(versionTag);
-      if (releaseData == null) return null;
-
-      final assets = releaseData['assets'] as List;
-      final apkAsset = assets.firstWhere(
-        (asset) => (asset['name'] as String).endsWith('.apk'),
-        orElse: () => null,
-      );
-      if (apkAsset == null) return null;
-
-      final downloadUrl = apkAsset['browser_download_url'] as String;
-
-      if (!await _requestStoragePermission()) return null;
-
-      final directory = await getExternalStorageDirectory();
-      final filePath = '${directory!.path}/shanzone_$versionTag.apk';
-      final file = File(filePath);
-
-      final response = await http.get(Uri.parse(downloadUrl));
-      if (response.statusCode == 200) {
-        await file.writeAsBytes(response.bodyBytes);
-        return filePath;
-      }
-      return null;
-    } catch (e) {
-      debugPrint('❌ Download failed: $e');
-      return null;
-    }
-  }
-
-  static Future<bool> installApk(String filePath) async {
-    try {
-      if (await Permission.requestInstallPackages.isDenied) {
-        await Permission.requestInstallPackages.request();
-        if (await Permission.requestInstallPackages.isDenied) return false;
-      }
-      final result = await OpenFile.open(filePath);
-      return result.type == ResultType.done;
-    } catch (e) {
-      debugPrint('❌ Installation failed: $e');
-      return false;
-    }
-  }
-
-  // ─── Private helpers ──────────────────────────────────────
-
-  static Future<String> _getCurrentVersion() async {
-    final info = await PackageInfo.fromPlatform();
-    return info.version;
-  }
-
-  static bool _isNewerVersion(String current, String latest) {
-    final c = current.replaceAll('v', '');
-    final l = latest.replaceAll('v', '');
-    final cParts = c.split('.').map(int.parse).toList();
-    final lParts = l.split('.').map(int.parse).toList();
-    for (int i = 0; i < cParts.length; i++) {
-      if (i >= lParts.length) return false;
-      if (lParts[i] > cParts[i]) return true;
-      if (lParts[i] < cParts[i]) return false;
-    }
-    return lParts.length > cParts.length;
-  }
-
-  static Future<Map<String, dynamic>?> _getReleaseData(String tag) async {
-    final url = 'https://api.github.com/repos/$_owner/$_repo/releases/tags/$tag';
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-    return null;
-  }
-
-  static Future<bool> _requestStoragePermission() async {
-    if (Platform.isAndroid) {
-      final status = await Permission.storage.status;
-      if (!status.isGranted) {
-        final result = await Permission.storage.request();
-        return result.isGranted;
-      }
-      return true;
-    }
-    return true;
-  }
-}
 
 // ─── Splash Screen with Update Check ──────────────────────────
 class SplashScreen extends StatefulWidget {
@@ -139,7 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkForUpdates() async {
-    // Wait a moment to let the splash screen show
+    // Show splash for at least 1 second
     await Future.delayed(const Duration(seconds: 1));
 
     final latestVersion = await UpdateService.checkForUpdate();
@@ -155,9 +45,10 @@ class _SplashScreenState extends State<SplashScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Update Available 🚀'),
+        title: const Text('🚀 Update Available'),
         content: Text(
-          'A new version ($version) is available.\nWould you like to download and install it now?',
+          'A new version **$version** is available.\n\n'
+          'Would you like to download and install it now?',
         ),
         actions: [
           TextButton(
@@ -167,21 +58,39 @@ class _SplashScreenState extends State<SplashScreen> {
             },
             child: const Text('Skip'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () async {
               Navigator.pop(context);
-              // Show progress indicator (optional)
+              // Show progress dialog
+              _showProgressDialog();
               final path = await UpdateService.downloadApk(version);
               if (path != null) {
                 await UpdateService.installApk(path);
-                // After installation, the app will restart
+                // The app will restart after installation
               } else {
-                _showErrorDialog('Failed to download the update.');
+                _showErrorDialog('Failed to download the update. Please try again.');
               }
             },
             child: const Text('Update Now'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showProgressDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Downloading update...'),
+          ],
+        ),
       ),
     );
   }
@@ -223,16 +132,26 @@ class _SplashScreenState extends State<SplashScreen> {
             const Text(
               'SHAN ZONE',
               style: TextStyle(
-                fontSize: 32,
+                fontSize: 36,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF5D3AAE),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            const Text(
+              'Broadband',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 24),
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              AppLocale.current.value == 'hi' ? 'जाँच हो रही है...' : 'Checking for updates...',
+              AppLocale.current.value == 'hi'
+                  ? 'जाँच हो रही है...'
+                  : 'Checking for updates...',
               style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
           ],
@@ -259,7 +178,7 @@ class ShanZoneApp extends StatelessWidget {
       title: 'SHAN ZONE',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const SplashScreen(), // ← now checks for updates
+      home: const SplashScreen(),
     );
   }
 }
