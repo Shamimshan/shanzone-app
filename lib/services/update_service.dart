@@ -1,27 +1,29 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file/open_file.dart';
-import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 
 class UpdateService {
-  // Change these to match your GitHub repo
-  static const String _owner = 'YOUR_GITHUB_USERNAME';
-  static const String _repo = 'shanzone_app';
+  // ─── CONFIGURE THIS ────────────────────────────────────────
+  static const String _owner = 'Shamimshan';        // ← Your GitHub username
+  static const String _repo = 'shanzone-app';       // ← Your repo name
+  // ──────────────────────────────────────────────────────────
+
   static const String _apiUrl =
       'https://api.github.com/repos/$_owner/$_repo/releases/latest';
 
   /// Check if a new version is available on GitHub.
-  /// Returns the latest version tag (e.g., "v1.0.2") or null if no update.
+  /// Returns the latest version tag (e.g., "v1.0.2") or null.
   static Future<String?> checkForUpdate() async {
     try {
       final response = await http.get(Uri.parse(_apiUrl));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final latestTag = data['tag_name'] as String; // e.g., "v1.0.2"
+        final latestTag = data['tag_name'] as String;
         final currentVersion = await _getCurrentVersion();
         return _isNewerVersion(currentVersion, latestTag) ? latestTag : null;
       }
@@ -32,14 +34,9 @@ class UpdateService {
     }
   }
 
-  /// Download the latest APK from GitHub Release assets.
-  static Future<String?> downloadApk({
-    required BuildContext context,
-    required String versionTag,
-    VoidCallback? onProgress,
-  }) async {
+  /// Download the latest APK from GitHub Release.
+  static Future<String?> downloadApk(String versionTag) async {
     try {
-      // 1. Get the download URL from the release
       final releaseData = await _getReleaseData(versionTag);
       if (releaseData == null) return null;
 
@@ -55,12 +52,8 @@ class UpdateService {
 
       final downloadUrl = apkAsset['browser_download_url'] as String;
 
-      // 2. Request storage permission
-      if (await _requestStoragePermission() == false) {
-        return null;
-      }
+      if (!await _requestStoragePermission()) return null;
 
-      // 3. Download the APK
       final directory = await getExternalStorageDirectory();
       final filePath = '${directory!.path}/shanzone_$versionTag.apk';
       final file = File(filePath);
@@ -78,10 +71,9 @@ class UpdateService {
     }
   }
 
-  /// Install the downloaded APK.
+  /// Install the downloaded APK using the system installer.
   static Future<bool> installApk(String filePath) async {
     try {
-      // Request install permission (Android 8+)
       if (await Permission.requestInstallPackages.isDenied) {
         await Permission.requestInstallPackages.request();
         if (await Permission.requestInstallPackages.isDenied) {
@@ -89,8 +81,6 @@ class UpdateService {
           return false;
         }
       }
-
-      // Open the APK with the system installer
       final result = await OpenFile.open(filePath);
       return result.type == ResultType.done;
     } catch (e) {
@@ -99,25 +89,28 @@ class UpdateService {
     }
   }
 
-  // ─── Private Helpers ────────────────────────────────────────
+  // ─── Private Helpers ──────────────────────────────────────
 
   static Future<String> _getCurrentVersion() async {
     final info = await PackageInfo.fromPlatform();
-    return info.version; // e.g., "1.0.1"
+    return info.version; // e.g., "1.0.0"
   }
 
   static bool _isNewerVersion(String current, String latest) {
-    // Remove 'v' prefix if present
     final c = current.replaceAll('v', '');
     final l = latest.replaceAll('v', '');
-    final cParts = c.split('.').map(int.parse).toList();
-    final lParts = l.split('.').map(int.parse).toList();
-    for (int i = 0; i < cParts.length; i++) {
-      if (i >= lParts.length) return false;
-      if (lParts[i] > cParts[i]) return true;
-      if (lParts[i] < cParts[i]) return false;
+    try {
+      final cParts = c.split('.').map(int.parse).toList();
+      final lParts = l.split('.').map(int.parse).toList();
+      for (int i = 0; i < cParts.length; i++) {
+        if (i >= lParts.length) return false;
+        if (lParts[i] > cParts[i]) return true;
+        if (lParts[i] < cParts[i]) return false;
+      }
+      return lParts.length > cParts.length;
+    } catch (e) {
+      return false;
     }
-    return lParts.length > cParts.length;
   }
 
   static Future<Map<String, dynamic>?> _getReleaseData(String tag) async {
@@ -138,6 +131,6 @@ class UpdateService {
       }
       return true;
     }
-    return true; // iOS handles it differently
+    return true;
   }
 }
