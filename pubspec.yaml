@@ -11,21 +11,21 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
 
-  # ── Existing dependencies ──────────────────────────────────
-  http: ^1.2.1                    # Apps Script API calls + speed test
-  shared_preferences: ^2.2.3      # local session / remembered device
-  image_picker: ^1.1.2            # profile photo
-  url_launcher: ^6.3.0            # UPI payment + WhatsApp/Call
-  google_fonts: ^6.2.1            # Poppins font
-  qr_flutter: ^4.1.0              # UPI QR code
-  local_auth: ^2.3.0              # fingerprint login
-  flutter_svg: ^2.0.9             # WiFi icon
+  # ── Existing ────────────────────────────────────────────────
+  http: ^1.2.1
+  shared_preferences: ^2.2.3
+  image_picker: ^1.1.2
+  url_launcher: ^6.3.0
+  google_fonts: ^6.2.1
+  qr_flutter: ^4.1.0
+  local_auth: ^2.3.0
+  flutter_svg: ^2.0.9
 
-  # ── Auto‑update dependencies (fixed versions) ──────────────
-  package_info_plus: ^8.0.0       # 🔄 upgraded to resolve conflict
-  permission_handler: ^11.3.0     # storage & install permissions
-  open_file: ^3.3.2               # open APK with system installer
-  path_provider: ^2.1.0           # external storage directory
+  # ── Auto‑update (fixed versions) ──────────────────────────
+  package_info_plus: ^8.0.0      # ✅ conflict resolved
+  permission_handler: ^11.3.0
+  open_file: ^3.3.2
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:
