@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../l10n/app_strings.dart';
 import '../theme/app_colors.dart';
@@ -190,7 +191,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       valueListenable: AppLocale.current,
       builder: (context, _, __) {
         return Scaffold(
-          backgroundColor: Colors.lightBlue.shade100, // sky blue
+          backgroundColor: AppColors.surfaceLight, // light purple (theme)
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -198,24 +199,24 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
             title: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'SHAN ZONE',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w900,
                     fontSize: 18,
-                    color: Color(0xFF1a1a2e),
+                    color: AppColors.textDark,
                     letterSpacing: 1.2,
                   ),
                 ),
                 const SizedBox(width: 6),
-                // WiFi Icon (SVG)
+                // WiFi Icon (SVG) – using AppColors.textDark for stroke
                 SvgPicture.string(
                   '''
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="${AppColors.textDark.toHex()}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 12.55a10.94 10.94 0 0 1 14.08 0" />
                     <path d="M1.42 9a16 16 0 0 1 21.16 0" />
                     <path d="M8.53 16.11a6 6 0 0 1 6.94 0" />
-                    <circle cx="12" cy="20" r="1.5" fill="#1a1a2e" stroke="none" />
+                    <circle cx="12" cy="20" r="1.5" fill="${AppColors.textDark.toHex()}" stroke="none" />
                   </svg>
                   ''',
                   width: 24,
@@ -250,7 +251,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                         value: _currentGaugeValue,
                         maxValue: 1000, // fixed scale 0–1000
                         color: phase == _Phase.upload
-                            ? const Color(0xFFFFA31A)
+                            ? AppColors.warning
                             : AppColors.gradientCenter,
                       ),
                       child: Center(
@@ -259,16 +260,16 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                           children: [
                             Text(
                               _currentGaugeValue.toStringAsFixed(1),
-                              style: const TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: 44,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF1a1a2e),
+                                color: AppColors.textDark,
                               ),
                             ),
-                            const Text(
+                            Text(
                               'Mbps',
-                              style: TextStyle(
-                                color: Color(0xFF2d2d44),
+                              style: GoogleFonts.poppins(
+                                color: AppColors.textMuted,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -276,8 +277,8 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                             const SizedBox(height: 6),
                             Text(
                               _phaseLabel,
-                              style: const TextStyle(
-                                color: Color(0xFF2d2d44),
+                              style: GoogleFonts.poppins(
+                                color: AppColors.textMuted,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -306,7 +307,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                           icon: Icons.upload_rounded,
                           label: S.of('upload'),
                           value: uploadMbps,
-                          color: const Color(0xFFFFA31A),
+                          color: AppColors.warning,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -332,14 +333,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                         return Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(30),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.gradientCenter,
-                                const Color(0xFFFF9FFC), // fixed: pink accent
-                              ],
-                            ),
+                            gradient: AppColors.brandGradient, // uses app gradient
                             boxShadow: [
                               if (!testing)
                                 BoxShadow(
@@ -366,9 +360,10 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                               testing
                                   ? S.of('speedTestRunning')
                                   : S.of('speedTestStart'),
-                              style: const TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 16,
+                                color: Colors.white,
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -391,8 +386,8 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                   const SizedBox(height: 20),
                   Text(
                     'Powered by SHAN ZONE Core Network',
-                    style: TextStyle(
-                      color: const Color(0xFF2d2d44).withOpacity(0.7),
+                    style: GoogleFonts.poppins(
+                      color: AppColors.textMuted.withOpacity(0.7),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -433,7 +428,7 @@ class _ResultCard extends StatelessWidget {
         border: Border.all(color: Colors.white.withOpacity(0.4)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: AppColors.shadowColor.withOpacity(0.1),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -445,25 +440,25 @@ class _ResultCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             value == 0 ? '--' : value.toStringAsFixed(unit == 'ms' ? 0 : 1),
-            style: const TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF1a1a2e),
+              color: AppColors.textDark,
             ),
           ),
           Text(
             unit,
-            style: const TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 10,
-              color: Color(0xFF2d2d44),
+              color: AppColors.textMuted,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 10.5,
-              color: Color(0xFF2d2d44),
+              color: AppColors.textMuted,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -495,7 +490,7 @@ class _GaugePainter extends CustomPainter {
 
     // ── Background arc ──
     final bgPaint = Paint()
-      ..color = Colors.white.withOpacity(0.5)
+      ..color = AppColors.glassFillLight.withOpacity(0.5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 14
       ..strokeCap = StrokeCap.round;
@@ -508,15 +503,13 @@ class _GaugePainter extends CustomPainter {
     );
 
     // ── Scale markings (0, 100, 200, … 1000) ──
-    final textStyle = TextStyle(
-      color: const Color(0xFF1a1a2e),
+    final textStyle = GoogleFonts.poppins(
+      color: AppColors.textDark,
       fontSize: 10,
       fontWeight: FontWeight.w600,
-      fontFamily: 'Orbitron',
     );
-    final textSpan = TextSpan(text: '', style: textStyle);
     final textPainter = TextPainter(
-      text: textSpan,
+      text: const TextSpan(text: ''),
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.center,
     );
@@ -536,7 +529,7 @@ class _GaugePainter extends CustomPainter {
         Offset(x1, y1),
         Offset(x2, y2),
         Paint()
-          ..color = const Color(0xFF1a1a2e)
+          ..color = AppColors.textDark
           ..strokeWidth = 1.5,
       );
 
@@ -568,7 +561,7 @@ class _GaugePainter extends CustomPainter {
         Offset(x1, y1),
         Offset(x2, y2),
         Paint()
-          ..color = const Color(0xFF1a1a2e)
+          ..color = AppColors.textDark
           ..strokeWidth = 1,
       );
     }
@@ -622,7 +615,7 @@ class _GaugePainter extends CustomPainter {
       center,
       needleEnd,
       Paint()
-        ..color = const Color(0xFF1a1a2e)
+        ..color = AppColors.textDark
         ..strokeWidth = 4
         ..strokeCap = StrokeCap.round
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
@@ -632,7 +625,7 @@ class _GaugePainter extends CustomPainter {
       center,
       needleEnd,
       Paint()
-        ..color = const Color(0xFF1a1a2e)
+        ..color = AppColors.textDark
         ..strokeWidth = 3
         ..strokeCap = StrokeCap.round,
     );
@@ -657,4 +650,11 @@ class _GaugePainter extends CustomPainter {
       oldDelegate.value != value ||
       oldDelegate.maxValue != maxValue ||
       oldDelegate.color != color;
+}
+
+// ─── Helper extension to convert Color to hex string ─────────
+extension ColorToHex on Color {
+  String toHex() {
+    return '#${(value & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0').substring(0, 6)}';
+  }
 }
