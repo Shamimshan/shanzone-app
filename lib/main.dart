@@ -8,12 +8,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'l10n/app_strings.dart';
-import 'screens/speedtest_screen.dart'; // ← Replace with your actual home screen
+import 'screens/speedtest_screen.dart'; // ← replace with your actual home
 import 'services/session_service.dart';
 import 'services/update_service.dart';
 import 'theme/app_theme.dart';
 
-// ─── Splash Screen with Update Check ──────────────────────────
+// ─── Splash Screen ──────────────────────────────────────────
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -29,9 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkForUpdates() async {
-    // Show splash for at least 1 second
     await Future.delayed(const Duration(seconds: 1));
-
     final latestVersion = await UpdateService.checkForUpdate();
     if (latestVersion != null && mounted) {
       _showUpdateDialog(latestVersion);
@@ -47,8 +45,9 @@ class _SplashScreenState extends State<SplashScreen> {
       builder: (context) => AlertDialog(
         title: const Text('🚀 Update Available'),
         content: Text(
-          'A new version **$version** is available.\n\n'
-          'Would you like to download and install it now?',
+          'Version **$version** is ready.\n\n'
+          'Would you like to download and install it now?\n'
+          '(Internet connection required)',
         ),
         actions: [
           TextButton(
@@ -61,15 +60,8 @@ class _SplashScreenState extends State<SplashScreen> {
           FilledButton(
             onPressed: () async {
               Navigator.pop(context);
-              // Show progress dialog
-              _showProgressDialog();
-              final path = await UpdateService.downloadApk(version);
-              if (path != null) {
-                await UpdateService.installApk(path);
-                // The app will restart after installation
-              } else {
-                _showErrorDialog('Failed to download the update. Please try again.');
-              }
+              // Show progress
+              await _startDownload(version);
             },
             child: const Text('Update Now'),
           ),
@@ -78,21 +70,42 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 
-  void _showProgressDialog() {
+  Future<void> _startDownload(String version) async {
+    // Show progress dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
+      builder: (context) => AlertDialog(
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Downloading update...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text('Downloading update $version...'),
           ],
         ),
       ),
     );
+
+    final path = await UpdateService.downloadApk(version);
+    // Close progress dialog
+    if (mounted) Navigator.pop(context);
+
+    if (path != null) {
+      final installed = await UpdateService.installApk(path);
+      if (!installed && mounted) {
+        _showErrorDialog('Installation failed. Please open the APK manually.');
+      }
+      // If installed, the app will restart, so no need to navigate.
+    } else {
+      if (mounted) {
+        _showErrorDialog(
+          'Failed to download the update.\n\n'
+          'Please check your internet connection and storage space.\n'
+          'You can also download the APK manually from the GitHub release.',
+        );
+      }
+    }
   }
 
   void _showErrorDialog(String message) {
@@ -118,7 +131,6 @@ class _SplashScreenState extends State<SplashScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const SpeedTestScreen()),
-      // ⚠️ Replace with your actual home screen widget
     );
   }
 
@@ -140,10 +152,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 8),
             const Text(
               'Broadband',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 24),
             const CircularProgressIndicator(),
@@ -161,10 +170,9 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// ─── Main App ──────────────────────────────────────────────────
+// ─── Main ──────────────────────────────────────────────────
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Remember the user's last chosen language
   AppLocale.current.value = await SessionService.getLang();
   runApp(const ShanZoneApp());
 }
